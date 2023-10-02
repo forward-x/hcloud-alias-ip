@@ -5,50 +5,53 @@ import (
 	"flag"
 	"fmt"
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
-	"log"
 	"net"
+	"os"
 )
 
 var client *hcloud.Client
 
 func main() {
-	apiToken := flag.String("token", "HCloud API Token", "-token <API Token>")
-	strAliasIP := flag.String("alias-ip", "Alias IP", "-alias-ip <Alias-IP>")
-	networkName := flag.String("network-name", "Network Name", "-network-name <Network Name>")
-	serversLabel := flag.String("servers-label", "Servers Label", "-servers-label <Servers Label>")
+	apiToken := flag.String("token", "", "-token <API Token>")
+	strAliasIP := flag.String("alias-ip", "", "-alias-ip <Alias-IP>")
+	networkName := flag.String("network-name", "", "-network-name <Network Name>")
+	serverLabel := flag.String("servers-label", "", "-servers-label <Servers Label>")
 	flag.Parse()
 
 	if *apiToken == "" {
-		log.Fatalf("No API Token specified!")
+		ShowUsage()
 	}
 	if *strAliasIP == "" {
-		log.Fatalf("No Alias-IP specified!")
+		ShowUsage()
+	}
+	if *networkName == "" {
+		ShowUsage()
+	}
+	if *serverLabel == "" {
+		ShowUsage()
 	}
 
 	aliasIP := net.ParseIP(*strAliasIP)
 
-	// Get System Hostname
-	//serverName, err := os.Hostname()
-	//if err != nil {
-	//	panic(err)
-	//}
-
-	serverName := "test-db01"
+	serverName, err := os.Hostname()
+	if err != nil {
+		panic(fmt.Sprintf("Cannot get hostname: %s", err))
+	}
 
 	client = hcloud.NewClient(hcloud.WithToken(*apiToken))
 
 	targetNetwork, _, err := client.Network.GetByName(context.Background(), *networkName)
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("Cannot find network '%s': %s", *networkName, err))
 	}
 
 	servers, _, err := client.Server.List(context.Background(), hcloud.ServerListOpts{
 		ListOpts: hcloud.ListOpts{
-			LabelSelector: *serversLabel,
+			LabelSelector: *serverLabel,
 		},
 	})
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("Cannot list servers by label '%s': %s", *serverLabel, err))
 	}
 
 	currentServer := findServerByAliasIP(servers, targetNetwork, aliasIP)
@@ -86,7 +89,7 @@ func findServerByAliasIP(servers []*hcloud.Server, targetNetwork *hcloud.Network
 func removeAliasIP(server *hcloud.Server, targetNetwork *hcloud.Network, aliasIP net.IP) {
 	serverNet := findNetwork(server.PrivateNet, *targetNetwork)
 	if serverNet == nil {
-		log.Fatalf("Cannot remove Alias-IP '%s' from Server '%s', cannot find required network", aliasIP, server.Name)
+		panic(fmt.Sprintf("Cannot remove Alias-IP '%s' from Server '%s', cannot find required network", aliasIP, server.Name))
 	}
 
 	index := indexOf(serverNet.Aliases, aliasIP)
@@ -101,7 +104,7 @@ func removeAliasIP(server *hcloud.Server, targetNetwork *hcloud.Network, aliasIP
 		AliasIPs: aliases,
 	})
 	if err != nil {
-		log.Fatalf("Cannot remove Alias-IP '%s' from Server '%s': %s", aliasIP, server.Name, err)
+		panic(fmt.Sprintf("Cannot remove Alias-IP '%s' from Server '%s': %s", aliasIP, server.Name, err))
 	}
 
 	fmt.Printf("Alias-IP '%s' was removed from Server '%s'\n", aliasIP, server.Name)
@@ -110,7 +113,7 @@ func removeAliasIP(server *hcloud.Server, targetNetwork *hcloud.Network, aliasIP
 func assignAliasIP(targetServerName string, targetNetwork *hcloud.Network, aliasIP net.IP) {
 	targetServer, _, err := client.Server.GetByName(context.Background(), targetServerName)
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("Cannot get Server '%s': %s", targetServerName, err))
 	}
 
 	serverNet := findNetwork(targetServer.PrivateNet, *targetNetwork)
@@ -123,8 +126,18 @@ func assignAliasIP(targetServerName string, targetNetwork *hcloud.Network, alias
 	})
 
 	if err != nil {
-		log.Fatalf("Cannot assign Alias-IP '%s' to Server '%s'", aliasIP, targetServer.Name)
+		panic(fmt.Sprintf("Cannot assign Alias-IP '%s' to Server '%s'", aliasIP, targetServer.Name))
 	}
 
 	fmt.Printf("Alias-IP '%s' was assigned to Server '%s'\n", aliasIP, targetServer.Name)
+}
+
+func ShowUsage() {
+	fmt.Printf(`Usage:
+hcloud-alias-ip -alias-ip <Alias-IP> \
+                -network-name <Network Name> \
+                -server-label <Server Label> \
+                -token <API Token>
+`)
+	os.Exit(-1)
 }

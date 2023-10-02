@@ -12,6 +12,6 @@ A CLI utility to assign an Alias-IP to the Server executing it.
 ```bash
 hcloud-alias-ip -alias-ip <Alias-IP> \
                 -network-name <Network Name> \
-                 -server-label <Server Label> \
-                 -token <API Token>
+                -server-label <Server Label> \
+                -token <API Token>
 ```
