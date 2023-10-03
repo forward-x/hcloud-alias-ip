@@ -12,7 +12,7 @@ A CLI utility to assign an Alias-IP to the Server executing it.
 Download and unpack `hcloud-alias-ip`
 
 ```bash
-HCLOUD_ALIAS_IP_VERSION=v0.0.2
+HCLOUD_ALIAS_IP_VERSION=v0.0.3
 wget -O hcloud-alias-ip.tar.gz https://github.com/glav-kod/hcloud-alias-ip/releases/download/$HCLOUD_ALIAS_IP_VERSION/hcloud-alias-ip-$HCLOUD_ALIAS_IP_VERSION-linux-amd64.tar.gz
 tar -zxvf hcloud-alias-ip.tar.gz
 ```

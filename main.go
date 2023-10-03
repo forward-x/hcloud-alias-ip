@@ -15,7 +15,7 @@ func main() {
 	apiToken := flag.String("token", "", "-token <API Token>")
 	strAliasIP := flag.String("alias-ip", "", "-alias-ip <Alias-IP>")
 	networkName := flag.String("network-name", "", "-network-name <Network Name>")
-	serverLabel := flag.String("servers-label", "", "-servers-label <Servers Label>")
+	serverLabel := flag.String("server-label", "", "-server-label <Server Label>")
 	flag.Parse()
 
 	if *apiToken == "" {
