@@ -4,9 +4,11 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 	"net"
 	"os"
+	"time"
+
+	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 )
 
 var client *hcloud.Client
@@ -99,12 +101,21 @@ func removeAliasIP(server *hcloud.Server, targetNetwork *hcloud.Network, aliasIP
 
 	aliases := removeByIndex(serverNet.Aliases, index)
 
-	_, _, err := client.Server.ChangeAliasIPs(context.Background(), server, hcloud.ServerChangeAliasIPsOpts{
+	action, _, err := client.Server.ChangeAliasIPs(context.Background(), server, hcloud.ServerChangeAliasIPsOpts{
 		Network:  serverNet.Network,
 		AliasIPs: aliases,
 	})
 	if err != nil {
 		panic(fmt.Sprintf("Cannot remove Alias-IP '%s' from Server '%s': %s", aliasIP, server.Name, err))
+	}
+
+	for action.Status != hcloud.ActionStatusSuccess {
+		action, _, err = client.Action.GetByID(context.Background(), action.ID)
+		if err != nil {
+			fmt.Printf("Cannot get action by ID '%d': %s", action.ID, err)
+			continue
+		}
+		time.Sleep(300 * time.Millisecond)
 	}
 
 	fmt.Printf("Alias-IP '%s' was removed from Server '%s'\n", aliasIP, server.Name)
@@ -120,16 +131,39 @@ func assignAliasIP(targetServerName string, targetNetwork *hcloud.Network, alias
 
 	serverAliases := append(serverNet.Aliases, aliasIP)
 
-	_, _, err = client.Server.ChangeAliasIPs(context.Background(), targetServer, hcloud.ServerChangeAliasIPsOpts{
+	action, _, err := client.Server.ChangeAliasIPs(context.Background(), targetServer, hcloud.ServerChangeAliasIPsOpts{
 		Network:  serverNet.Network,
 		AliasIPs: serverAliases,
 	})
-
 	if err != nil {
 		panic(fmt.Sprintf("Cannot assign Alias-IP '%s' to Server '%s'", aliasIP, targetServer.Name))
 	}
 
-	fmt.Printf("Alias-IP '%s' was assigned to Server '%s'\n", aliasIP, targetServer.Name)
+	for action.Status != hcloud.ActionStatusSuccess {
+		action, _, err = client.Action.GetByID(context.Background(), action.ID)
+		if err != nil {
+			fmt.Printf("Cannot get action by ID '%d': %s", action.ID, err)
+			continue
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+
+	for {
+		targetServer, _, err = client.Server.GetByID(context.Background(), targetServer.ID)
+		if err != nil {
+			panic(fmt.Sprintf("Cannot get Server by ID '%d': %s", targetServer.ID, err))
+		}
+
+		serverNet = findNetwork(targetServer.PrivateNet, *targetNetwork)
+
+		for _, serverAlias := range serverNet.Aliases {
+			if serverAlias.Equal(aliasIP) {
+				fmt.Printf("Alias-IP '%s' was assigned to Server '%s'\n", aliasIP, targetServer.Name)
+				return
+			}
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
 }
 
 func ShowUsage() {
